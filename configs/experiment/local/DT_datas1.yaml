@@ -1,0 +1,70 @@
+# @package _global_
+defaults:
+  - override /datamodule: datas1.yaml
+  - override /module: multilabel.yaml
+  - override /module/network: efficientnet.yaml
+  - override /callbacks: default.yaml
+  - override /trainer: single_gpu.yaml
+  - override /datamodule/transforms: bird_default_multilabel.yaml
+  - override /paths: custom_dataloader.yaml
+  - override /hydra: default.yaml
+
+tags: ["datas1", "efficientnet", "mutilabel"]
+seed: 42
+train: True
+test: True
+
+logger: 
+  wandb:
+    mode: disabled
+
+module:
+  optimizer:
+    _target_: torch.optim.AdamW
+    lr: 5e-4
+    weight_decay: 5e-4
+  network: 
+    torch_compile: False
+    model:
+      pretrain_info: null
+      local_checkpoint: /home/gil/comp0173/model.ckpt
+
+trainer:
+  min_epochs: 1
+  max_epochs: 10
+  accelerator: "auto"
+
+datamodule:
+  dataset:
+    val_split: 0.2
+    class_weights_loss: null
+    class_weights_sampler: null
+    classlimit: 500
+    eventlimit: 5
+  transforms:
+    preprocessing:
+      spectrogram_conversion:
+        n_fft: 2048
+        hop_length: 256
+        power: 2.0
+      melscale_conversion:
+        n_mels: 256
+        n_stft: 1025
+  loaders:
+    train:
+      batch_size: 4
+      num_workers: 1
+    valid:
+      batch_size: 4
+      num_workers: 1
+    test:
+      batch_size: 4
+      num_workers: 1
+  mapper: 
+    biggest_cluster: True
+    no_call: False
+
+callbacks:
+  model_checkpoint:
+    save_last: True
+    every_n_epochs: 3

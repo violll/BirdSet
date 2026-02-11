@@ -58,6 +58,26 @@ class DatasetConfig:
 
 
 @dataclass
+class DataS1DatasetConfig(DatasetConfig):
+    data_dir: str = "/home/gil/comp0173/BirdSet/data/DataS1"
+    train_parquet_path: str = "/home/gil/comp0173/BirdSet/data/DataS1_DT_train/metadata.jsonl"
+    test_5s_parquet_path: str = "/home/gil/comp0173/BirdSet/data/DataS1/metadata.jsonl"
+    seed: int = 42
+    n_workers: int = 1
+    val_split: float = 0.2
+    task: Literal["multiclass", "multilabel"] = "multilabel"
+    subset: Optional[int] = None
+    sample_rate: int = 32_000
+    class_weights_loss: Optional[bool] = None
+    class_weights_sampler: Optional[bool] = None
+    classlimit: Optional[int] = None
+    eventlimit: Optional[int] = None
+    direct_fingerprint: Optional[str] = (
+        None  # TODO only supported in PretrainDatamodule
+    )
+
+
+@dataclass
 class LoaderConfig:
     """
     A class used to configure the data loader for the model.

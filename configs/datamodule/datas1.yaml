@@ -1,0 +1,26 @@
+# DataS1 local dataset
+_target_: birdset.datamodule.datas1_datamodule.DataS1DataModule
+
+defaults: 
+  - _self_
+  - transforms: bird_default.yaml
+  - loaders: default.yaml
+  - mapper: xc_bambird_mapper.yaml
+
+dataset:
+  train_parquet_path: /home/gil/comp0173/BirdSet/data/DataS1_DT_train/metadata-train.parquet
+  test_5s_parquet_path: /home/gil/comp0173/BirdSet/data/DataS1/metadata.parquet
+
+  data_dir: ${paths.dataset_path}
+  hf_path: ""
+  hf_name: DataS1
+  seed: ${seed}
+  n_workers: 5
+  val_split: 0.2
+  task: ${module.task}
+  subset: null
+  sample_rate: ${module.network.sample_rate}
+  class_weights_loss: null
+  class_weights_sampler: null
+  classlimit: 500
+  eventlimit: 5
