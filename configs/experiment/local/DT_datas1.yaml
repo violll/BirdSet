@@ -52,14 +52,14 @@ datamodule:
         n_stft: 1025
   loaders:
     train:
-      batch_size: 4
-      num_workers: 1
+      batch_size: 128
+      num_workers: 32
     valid:
-      batch_size: 4
-      num_workers: 1
+      batch_size: 128
+      num_workers: 32
     test:
-      batch_size: 4
-      num_workers: 1
+      batch_size: 128
+      num_workers: 32
   mapper: 
     biggest_cluster: True
     no_call: False
