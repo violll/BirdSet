@@ -8,8 +8,8 @@ defaults:
   - mapper: xc_bambird_mapper.yaml
 
 dataset:
-  train_parquet_path: /home/gil/comp0173/BirdSet/data/DataS1_DT_train/metadata-train.parquet
-  test_5s_parquet_path: /home/gil/comp0173/BirdSet/data/DataS1/metadata.parquet
+  train_parquet_path: ${paths.train_dataset_path}/metadata-train.parquet
+  test_5s_parquet_path: ${paths.dataset_path}/metadata.parquet
 
   data_dir: ${paths.dataset_path}
   hf_path: ""
