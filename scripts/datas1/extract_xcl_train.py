@@ -4,24 +4,23 @@ import os
 import json
 import time
 import random
+from pathlib import Path
 from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm.auto import tqdm
 from pydub import AudioSegment
 
 # --- CONFIG ---
-PARQUET_FILE = "/home/gil/comp0173/XCL_metadata.parquet"
-TARGET_CLASSES = [
-    "amgplo", "arcter", "baisan", "bkbplo", "brant",
-    "batgod", "cangoo", "comrav", "dunlin", "gwfgoo",
-    "kineid", "laplon", "lobdow", "lotduc", "lotjae",
-    "pacloo", "pecsan", "pomjae", "pursan", "redpha1",
-    "retloo", "rudtur", "sabgul", "sander", "semplo",
-    "semsan", "snobun", "snogoo", "speeid", "tunswa",
-    "whrsan"
-]
+REPO_ROOT = Path(__file__).resolve().parents[2]          # BirdSet/
+CLASS_MAPPING_JSON = REPO_ROOT / "resources/ebird_codes/DataS1_ebird_codes.json"
+PARQUET_FILE = "/home/gil/comp0173/XCL_metadata.parquet"  # external artifact, not repo-managed
+OUTPUT_DIR = REPO_ROOT / "data/DataS1_DT_train/ogg/"
 
-OUTPUT_DIR = "/home/gil/comp0173/BirdSet/data/DataS1_DT_train/ogg/"
+with open(CLASS_MAPPING_JSON) as f:
+    mapping = json.load(f)
+
+TARGET_CLASSES = [mapping["id2label"][str(i)] for i in range(len(mapping["id2label"]))]
+
 MAX_WORKERS = 4
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
