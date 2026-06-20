@@ -1,88 +1,84 @@
 """
 validate_schema.py
-Read-only validation for DataS1 dataset artifacts produced by schema alignment.
+Read-only validation and comparison for DataS1 dataset artifacts
+against canonical HF BirdSet HSN splits (train and test_5s).
 """
-import json
 from pathlib import Path
 
 import pandas as pd
 from datasets import load_dataset
 
-REPO_ROOT = Path(__file__).resolve().parents[1]          # BirdSet/
-CLASS_MAPPING_JSON = REPO_ROOT / "resources/ebird_codes/DataS1_ebird_codes.json"
-TRAIN_PARQUET = REPO_ROOT / "data/DataS1_DT_train/metadata-train.parquet"
-TEST_PARQUET = REPO_ROOT / "data/DataS1/metadata.parquet"
+REPO_ROOT = Path(__file__).resolve().parents[2]          # BirdSet/
 
 
-def load_label_order() -> dict[str, int]:
-    if not CLASS_MAPPING_JSON.exists():
-        raise FileNotFoundError(f"Missing class mapping: {CLASS_MAPPING_JSON}")
-    with open(CLASS_MAPPING_JSON) as f:
-        data = json.load(f)
-    return data.get("label2id", {})
+def load_hf_hsn_train():
+    return load_dataset("DBD-research-group/BirdSet", "HSN", split="train")
 
 
-def validate_train_schema(label_order: dict[str, int]) -> None:
-    if not TRAIN_PARQUET.exists():
-        print(f"[train] No train parquet at {TRAIN_PARQUET}, skipping.")
+def load_hf_hsn_test():
+    return load_dataset("DBD-research-group/BirdSet", "HSN", split="test_5s")
+
+
+def compare_schemas(split, train_test_splits) -> None:
+    print(f"\n== {split} parquet validation/compare ==")
+    if not train_test_splits[split]["datas1"].exists():
+        print(f"[{split}] Missing parquet at {train_test_splits[split]['datas1']}, skipping.")
         return
 
-    df = pd.read_parquet(TRAIN_PARQUET)
-    print(f"[train] Rows: {len(df)}, columns: {list(df.columns)}")
+    train_df = pd.read_parquet(train_test_splits[split]["datas1"])
 
-    if "ebird_code" not in df.columns:
-        print("[train] [WARN] Missing 'ebird_code' column")
-        return
+    print(f"[{split}] Rows: {len(train_df)}, columns: {list(train_df.columns)}")
 
-    present = set(df["ebird_code"].dropna().unique().tolist())
-    unknown = present - set(label_order.keys())
-    if unknown:
-        print(
-            f"[train] [WARN] Train parquet has codes not in TARGET_CLASSES: "
-            f"{sorted(unknown)[:10]}{'...' if len(unknown) > 10 else ''}"
-        )
-    else:
-        print("[train] Train parquet class coverage looks good.")
+    # compare against HF reference
+    try:
+        hf = train_test_splits[split]["hf"]
+        print(f"HF rows={len(hf)}")
+        print("[HF sample - first row]")
+        for k, v in hf[0].items():
+            print(f"  {k}: {repr(v)[:200]}")
+        print("[local sample - first row]")
+        lcl = pd.read_parquet(train_test_splits[split]["datas1"]).iloc[0]
+        for k, v in lcl.items():
+            print(f"  {k}: {repr(v)[:200]}")
+    except Exception as e:
+        print(f"[{split}] [SKIP] HF reference load failed: {e}")
 
+def view_ebird_code_multilabel_schema():
+    hf = load_hf_hsn_test()
+    df = hf.to_pandas()
 
-def validate_test_schema() -> None:
-    if not TEST_PARQUET.exists():
-        print(f"[test ] No test parquet at {TEST_PARQUET}, skipping.")
-        return
-
-    ds = load_dataset("parquet", data_files=str(TEST_PARQUET), split="train")
-
-    required = [
-        "audio",
-        "filepath",
-        "start_time",
-        "end_time",
-        "ebird_code",
-        "ebird_code_multilabel",
-        "ebird_code_secondary",
-    ]
-    missing = [c for c in required if c not in ds.features]
-    if missing:
-        print(f"[test ] [WARN] Missing expected columns: {missing}")
-    else:
-        print(f"[test ] Required columns present.")
-
-    print(f"[test ] Rows: {len(ds)}")
-    print(f"[test ] Features:\n    {ds.features}")
+    elem_counts = df["ebird_code_multilabel"].apply(
+        lambda x: len(x)
+    )
+    print("\nebird_code_multilabel length counts:")
+    print(elem_counts.value_counts().sort_index())
+    print("\nNum empty:", int((elem_counts == 0).sum()))
+    print("Num len=1:", int((elem_counts == 1).sum()))
+    print("Num len>1:", int((elem_counts > 1).sum()))
+    return elem_counts.value_counts()
 
 
 def main() -> None:
+    train_test_splits = {
+        "train": {
+            "datas1": REPO_ROOT / "data/DataS1_DT_train/metadata-train.parquet",
+            "hf": load_hf_hsn_train()
+        },
+        "test_5s": {
+            "datas1": REPO_ROOT / "data/DataS1/metadata.parquet",
+            "hf": load_hf_hsn_test()
+        }
+    }
+
     print("=" * 60)
-    print("Validate Schema: DataS1 artifacts")
+    print("Validate Schema + HF HSN compare: DataS1 artifacts")
     print("=" * 60)
 
-    label_order = load_label_order()
-    validate_train_schema(label_order)
-    print()
-    validate_test_schema()
+    for split in ["train", "test_5s"]:
+        compare_schemas(split, train_test_splits)
+    view_ebird_code_multilabel_schema()
 
-    print()
-    print("Done.")
+    print("\nDone.\n")
 
 
 if __name__ == "__main__":
