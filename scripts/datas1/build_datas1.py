@@ -30,6 +30,7 @@ DATASET_ROOT = REPO_ROOT / "data/DataS1"
 TRAIN_FULL_PARQUET = REPO_ROOT / "data/DataS1_DT_train/ogg/metadata-full.parquet"
 TRAIN_PARQUET = REPO_ROOT / "data/DataS1_DT_train/metadata-train.parquet"
 BOXED_ANNOTATIONS_CSV = REPO_ROOT / "data/DataS1/boxed_annotations_input_reindexed.csv"
+TEST_PARQUET_OUT = REPO_ROOT / "data/DataS1/metadata.parquet"
 
 
 def load_class_mapping() -> tuple[list[str], dict[str, int], dict[str, str]]:
@@ -198,6 +199,11 @@ def main() -> None:
 
     print("\nStep 3: Clip and cast test_5s dataset")
     test_5s_dataset = clip_and_cast_test_dataset(target_classes)
+
+    # Save the built test_5s split
+    TEST_PARQUET_OUT.parent.mkdir(parents=True, exist_ok=True)
+    test_5s_dataset.to_parquet(str(TEST_PARQUET_OUT))
+    print(f"Wrote test_5s parquet: {TEST_PARQUET_OUT} ({len(test_5s_dataset)} rows)")
 
     print("\nStep 4: Load train dataset")
     train_dataset = load_dataset("parquet", data_files=str(TRAIN_PARQUET), split="train")
