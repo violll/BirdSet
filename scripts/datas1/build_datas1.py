@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 
 import pandas as pd
-from datasets import load_dataset, Dataset, DatasetDict, Audio, ClassLabel, Sequence
+from datasets import load_dataset, Dataset, DatasetDict, Audio, ClassLabel, Sequence, Features
 from glob import glob
 from tqdm.auto import tqdm
 from opensoundscape.annotations import BoxedAnnotations
@@ -30,7 +30,6 @@ DATASET_ROOT = REPO_ROOT / "data/DataS1"
 TRAIN_FULL_PARQUET = REPO_ROOT / "data/DataS1_DT_train/ogg/metadata-full.parquet"
 TRAIN_PARQUET = REPO_ROOT / "data/DataS1_DT_train/metadata-train.parquet"
 BOXED_ANNOTATIONS_CSV = REPO_ROOT / "data/DataS1/boxed_annotations_input_reindexed.csv"
-TEST_PARQUET = REPO_ROOT / "data/DataS1/metadata.parquet"
 
 
 def load_class_mapping() -> tuple[list[str], dict[str, int], dict[str, str]]:
@@ -136,6 +135,13 @@ def build_boxed_annotations_csv(target_classes: list[str], ebird_df: pd.DataFram
     print(f"Wrote boxed annotations CSV: {BOXED_ANNOTATIONS_CSV} ({len(df_annots)} rows)")
 
 
+def load_hf_hsn_test_features() -> Features:
+    # provides access to canonical 29-column test_5s schema from HF BirdSet HSN
+    return load_dataset(
+        "DBD-research-group/BirdSet", "HSN", split="test_5s", streaming=True
+    ).features.copy()
+
+
 def clip_and_cast_test_dataset(target_classes: list[str]) -> Dataset:
     df_annots = pd.read_csv(BOXED_ANNOTATIONS_CSV, index_col=0)
     annots = BoxedAnnotations(df_annots)
@@ -153,10 +159,11 @@ def clip_and_cast_test_dataset(target_classes: list[str]) -> Dataset:
         columns={"labels": "ebird_code_multilabel", "file": "filepath"}
     )
 
-    # Load the canonical full schema (29 columns) from the existing test parquet
-    # and pad any columns missing from the clipped df with None, so the later
-    # .cast() to the complete HF schema succeeds. 
-    features = load_dataset("parquet", data_files=str(TEST_PARQUET), split="train").features.copy()
+    # Load the canonical 29-column schema from HF BirdSet HSN test_5s
+    features = load_hf_hsn_test_features()
+
+    # pad any columns missing from the clipped df with None
+    # so the later .cast() to the complete HF schema succeeds 
     for col in features:
         if col not in boxed_annots_df.columns:
             boxed_annots_df[col] = None
