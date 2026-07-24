@@ -153,7 +153,13 @@ def clip_and_cast_test_dataset(target_classes: list[str]) -> Dataset:
         columns={"labels": "ebird_code_multilabel", "file": "filepath"}
     )
 
+    # Load the canonical full schema (29 columns) from the existing test parquet
+    # and pad any columns missing from the clipped df with None, so the later
+    # .cast() to the complete HF schema succeeds. 
     features = load_dataset("parquet", data_files=str(TEST_PARQUET), split="train").features.copy()
+    for col in features:
+        if col not in boxed_annots_df.columns:
+            boxed_annots_df[col] = None
     features["ebird_code_multilabel"] = Sequence(ClassLabel(names=target_classes))
 
     dataset = (
