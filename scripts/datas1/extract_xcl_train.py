@@ -30,13 +30,17 @@ target_df = df[df['ebird_code'].isin(TARGET_CLASSES)].copy()
 print(f"Found {len(target_df)} samples for target classes")
 
 # Metadata adjustments to match DT training format
-target_df["filepath"] = target_df["filepath"].str.extract(r"(XC\d{4,6}\.ogg)")
+recording_ids = target_df["filepath"].str.extract(r"(XC\d{4,6}\.ogg)")
 target_df["ebird_code"] = target_df["ebird_code"].apply(
     lambda c: TARGET_CLASSES.index(c) if (not pd.isna(c) and c in TARGET_CLASSES) else pd.NA
 )
 target_df["ebird_code_multilabel"] = target_df["ebird_code_multilabel"].apply(
     lambda c: [TARGET_CLASSES.index(ebird_name) if (not pd.isna(ebird_name) and ebird_name in TARGET_CLASSES) else pd.NA for ebird_name in c]
 )
+
+target_df["filepath"] = recording_ids.map(
+        lambda p: os.path.join(OUTPUT_DIR, os.path.basename(p))
+    )
 target_df["audio"] = target_df["filepath"]
 
 # Save full metadata
