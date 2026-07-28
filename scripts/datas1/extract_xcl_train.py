@@ -15,6 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]          # BirdSet/
 CLASS_MAPPING_JSON = REPO_ROOT / "resources/ebird_codes/DataS1_ebird_codes.json"
 PARQUET_FILE = "/home/gil/comp0173/XCL_metadata.parquet"  # external artifact, not repo-managed
 OUTPUT_DIR = REPO_ROOT / "data/DataS1_DT_train/ogg/"
+OUTPUT_PARQUET = REPO_ROOT / "data/DataS1_DT_train/metadata-train.parquet"
 
 with open(CLASS_MAPPING_JSON) as f:
     mapping = json.load(f)
@@ -105,5 +106,9 @@ with open(META_PATH, "a") as meta_f:
                 meta_f.flush()
             elif res == "RateLimit":
                 time.sleep(10)
+
+available = target_df[target_df["filepath"].map(os.path.exists)]
+available.to_parquet(OUTPUT_PARQUET)
+print(f"Wrote train parquet: {OUTPUT_PARQUET} ({len(available)} rows)")
 
 print("Done!")

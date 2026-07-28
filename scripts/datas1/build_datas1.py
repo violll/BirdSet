@@ -3,11 +3,10 @@ build_datas1.py
 Data preparation pipeline for DataS1, translated from test.ipynb.
 
 Steps:
-1. Repair train parquet by dropping rows whose filepath is missing.
-2. Build boxed annotations input CSV with reindexed ebird codes.
-3. Clip annotations into 5-second segments.
-4. Cast to Hugging Face dataset schema and write metadata.parquet.
-5. Assemble final DatasetDict(train, test_5s).
+1. Build boxed annotations input CSV with reindexed ebird codes.
+2. Clip annotations into 5-second segments.
+3. Cast to Hugging Face dataset schema and write metadata.parquet.
+4. Assemble final DatasetDict(train, test_5s).
 """
 import json
 import os
@@ -61,18 +60,6 @@ def load_annotations_details() -> pd.DataFrame:
     if "scientific_name" not in df.columns:
         raise ValueError("annotations_details.csv must contain 'scientific_name' column")
     return df
-
-
-def repair_train_parquet(target_classes: list[str]) -> None:
-    if not TRAIN_FULL_PARQUET.exists():
-        raise FileNotFoundError(f"Missing train metadata-full parquet: {TRAIN_FULL_PARQUET}")
-
-    df_all = pd.read_parquet(TRAIN_FULL_PARQUET)
-
-    available = df_all[df_all["filepath"].map(os.path.exists)]
-    TRAIN_PARQUET.parent.mkdir(parents=True, exist_ok=True)
-    available.to_parquet(TRAIN_PARQUET)
-    print(f"Wrote repaired train parquet: {TRAIN_PARQUET} ({len(available)} rows)")
 
 
 def build_boxed_annotations_csv(target_classes: list[str], ebird_df: pd.DataFrame, dataset_df: pd.DataFrame) -> None:
@@ -191,13 +178,10 @@ def main() -> None:
     ebird_df = load_clements()
     dataset_df = load_annotations_details()
 
-    print("\nStep 1: Repair train parquet")
-    repair_train_parquet(target_classes)
-
-    print("\nStep 2: Build boxed annotations CSV")
+    print("\nStep 1: Build boxed annotations CSV")
     build_boxed_annotations_csv(target_classes, ebird_df, dataset_df)
 
-    print("\nStep 3: Clip and cast test_5s dataset")
+    print("\nStep 2: Clip and cast test_5s dataset")
     test_5s_dataset = clip_and_cast_test_dataset(target_classes)
 
     # Save the built test_5s split
@@ -205,11 +189,11 @@ def main() -> None:
     test_5s_dataset.to_parquet(str(TEST_PARQUET_OUT))
     print(f"Wrote test_5s parquet: {TEST_PARQUET_OUT} ({len(test_5s_dataset)} rows)")
 
-    print("\nStep 4: Load train dataset")
+    print("\nStep 3: Load train dataset")
     train_dataset = load_dataset("parquet", data_files=str(TRAIN_PARQUET), split="train")
     train_dataset = train_dataset.cast_column("audio", Audio(sampling_rate=32000, mono=True))
 
-    print("\nStep 5: Assemble DatasetDict")
+    print("\nStep 4: Assemble DatasetDict")
     dataset_dict = assemble_dataset_dict(train_dataset, test_5s_dataset)
     print(dataset_dict)
 
