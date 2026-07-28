@@ -13,7 +13,7 @@ from pydub import AudioSegment
 # --- CONFIG ---
 REPO_ROOT = Path(__file__).resolve().parents[2]          # BirdSet/
 CLASS_MAPPING_JSON = REPO_ROOT / "resources/ebird_codes/DataS1_ebird_codes.json"
-PARQUET_FILE = "/home/gil/comp0173/XCL_metadata.parquet"  # external artifact, not repo-managed
+PARQUET_FILE = "/home/gil/comp0173/XCL_metadata.parquet" 
 OUTPUT_DIR = REPO_ROOT / "data/DataS1_DT_train/ogg/"
 OUTPUT_PARQUET = REPO_ROOT / "data/DataS1_DT_train/metadata-train.parquet"
 
@@ -44,14 +44,12 @@ target_df["filepath"] = recording_ids.map(
     )
 target_df["audio"] = target_df["filepath"]
 
-# Save full metadata
+# Save XCL filtered metadata
 target_df.to_parquet(os.path.join(OUTPUT_DIR, "metadata-full.parquet"))
-
-META_PATH = os.path.join(OUTPUT_DIR, "metadata.parquet")
 
 
 def log_failure(message):
-    print(f"[FAILED] {message}")
+    tqdm.write(f"[FAILED] {message}")
 
 
 def download_hybrid(row_tuple):
@@ -68,10 +66,7 @@ def download_hybrid(row_tuple):
         log_failure(f"skipped parse error for {filename}: {exc}")
         return "Skipped"
 
-    save_name = f"XC{xc_id}.ogg"
-    save_path = os.path.join(OUTPUT_DIR, save_name)
-
-    if os.path.exists(save_path):
+    if os.path.exists(filename):
         return "Exists"
 
     time.sleep(random.uniform(0.5, 1.0))
@@ -80,11 +75,9 @@ def download_hybrid(row_tuple):
         r = requests.get(url, timeout=10)
         if r.status_code == 200:
             audio = AudioSegment.from_file(BytesIO(r.content))
-            audio.export(save_path, format="ogg")
+            audio.export(filename, format="ogg")
 
-            meta_entry = row.to_dict()
-            meta_entry['file_name'] = save_name
-            return json.dumps(meta_entry)
+            return "Downloaded"
 
         if r.status_code == 429:
             log_failure(f"rate limit for XC{xc_id}")
@@ -96,17 +89,15 @@ def download_hybrid(row_tuple):
 
 
 print(f"Downloading {len(target_df)} files...")
-with open(META_PATH, "a") as meta_f:
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = {executor.submit(download_hybrid, r): r for r in target_df.iterrows()}
-        for future in tqdm(as_completed(futures), total=len(target_df)):
-            res = future.result()
-            if res and res not in ["Exists", "Failed", "Skipped", "RateLimit"]:
-                meta_f.write(res + "\n")
-                meta_f.flush()
-            elif res == "RateLimit":
-                time.sleep(10)
 
+with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+    futures = {executor.submit(download_hybrid, r): r for r in target_df.iterrows()}
+    for future in tqdm(as_completed(futures), total=len(target_df)):
+        res = future.result()
+        if res == "RateLimit":
+            time.sleep(10)
+
+# filter training df by availability
 available = target_df[target_df["filepath"].map(os.path.exists)]
 available.to_parquet(OUTPUT_PARQUET)
 print(f"Wrote train parquet: {OUTPUT_PARQUET} ({len(available)} rows)")
