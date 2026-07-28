@@ -60,8 +60,8 @@ class DatasetConfig:
 @dataclass
 class DataS1DatasetConfig(DatasetConfig):
     data_dir: str = "/home/gil/comp0173/BirdSet/data/DataS1"
-    train_parquet_path: str = "/home/gil/comp0173/BirdSet/data/DataS1_DT_train/metadata.jsonl"
-    test_5s_parquet_path: str = "/home/gil/comp0173/BirdSet/data/DataS1/metadata.jsonl"
+    train_parquet_path: str = "/home/gil/comp0173/BirdSet/data/DataS1_DT_train/metadata-train.parquet"
+    test_5s_parquet_path: str = "/home/gil/comp0173/BirdSet/data/DataS1/metadata.parquet"
     seed: int = 42
     n_workers: int = 1
     val_split: float = 0.2
