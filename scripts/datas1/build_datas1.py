@@ -69,10 +69,6 @@ def repair_train_parquet(target_classes: list[str]) -> None:
 
     df_all = pd.read_parquet(TRAIN_FULL_PARQUET)
 
-    df_all["filepath"] = df_all["filepath"].map(
-        lambda p: os.path.join("data/DataS1_DT_train/ogg", os.path.basename(p))
-    )
-
     available = df_all[df_all["filepath"].map(os.path.exists)]
     TRAIN_PARQUET.parent.mkdir(parents=True, exist_ok=True)
     available.to_parquet(TRAIN_PARQUET)
