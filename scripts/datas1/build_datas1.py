@@ -156,6 +156,7 @@ def clip_and_cast_test_dataset(target_classes: list[str]) -> Dataset:
         if col not in boxed_annots_df.columns:
             boxed_annots_df[col] = None
     features["ebird_code_multilabel"] = Sequence(ClassLabel(names=target_classes))
+    boxed_annots_df["audio"] = boxed_annots_df["filepath"]
 
     dataset = (
         Dataset.from_pandas(boxed_annots_df)
