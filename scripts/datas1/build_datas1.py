@@ -95,7 +95,7 @@ def build_boxed_annotations_csv(target_classes: list[str], ebird_df: pd.DataFram
         )
 
         df["audio_file"] = df["audio_file"].apply(
-            lambda x: os.path.join("data/DataS1/audio_annots", os.path.basename(x))
+            lambda x: os.path.join(DATASET_ROOT, "audio_annots", os.path.basename(x))
         )
 
         df_ebird_class_names = pd.merge(
