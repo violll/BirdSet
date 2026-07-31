@@ -1,33 +1,13 @@
 #!/usr/bin/env python
 """
-validate_paper_results.py - NeurIPS-24 BirdSet validation iterator for RunPod.
+validate_paper_results.py - NeurIPS-24 BirdSet validation iterator with per-dataset deletion.
 
-Runs the validations in order, then evicts each dataset's download to keep disk
-bounded across runs. Eviction deletes ONLY the dataset download; run OUTPUTS
-(Hydra outputs/, checkpoints, metrics) are intentionally KEPT.
-
-Why not HF_DATASETS_CACHE?  BirdSet's BaseDataModuleHF._load_data (and
-DataS1DataModule._load_data) load data via
-    load_dataset(path=hf_path, name=hf_name, cache_dir=<data_dir>)
-where <data_dir> = PROJECT_ROOT/data_birdset/<hf_name>
-(cf. birdset/datamodule/base_datamodule.py:269 and
- configs/paths/default.yaml:10).
-It sets cache_dir explicitly, so redirecting the HF_DATASETS_CACHE env var
-has NO effect. Eviction therefore targets data_birdset/<hf_name> directly.
+Runs validations in order, then deletes each dataset download to keep disk bounded.
 
 Sequence:
-  1. XCL base-model eval:  birdset/eval.py  experiment="birdset_neurips24/XCL/efficientnet.yaml"
-       (hf_name = "XCL")
-  2. DT finetune+eval on the 8 paper datasets:
-      birdset/train.py  experiment="birdset_neurips24/<DS>/DT/efficientnet.yaml"
-  for DS in HSN NBP NES PER POW SNE SSW UHH.
-  Each stage: run -> rm -rf data_birdset/<hf_name> -> next.
-
-Usage:
-    python scripts/datas1/validate_paper_results.py
-    python scripts/datas1/validate_paper_results.py --dry-run
-    python scripts/datas1/validate_paper_results.py --datasets HSN,NBP
-    python scripts/datas1/validate_paper_results.py --skip-xcl      # skip XCL baseline eval
+  1. XCL eval:  birdset/eval.py  experiment="birdset_neurips24/XCL/efficientnet.yaml"
+  2. DT finetune+eval: birdset/train.py  experiment="birdset_neurips24/<DS>/DT/efficientnet.yaml"
+                        for DS in HSN NBP NES PER POW SNE SSW UHH.
 """
 import argparse
 import os
@@ -40,53 +20,77 @@ from pathlib import Path
 PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().parents[2]))
 
 # BirdSet downloads each dataset into data_birdset/<hf_name> via explicit
-# cache_dir=<data_dir> in base_datamodule.py:269.
-# This is the correct eviction target (NOT HF_DATASETS_CACHE).
+# cache_dir=<data_dir> in base_datamodule.py:269. The HF_DATASETS_CACHE
+# env var would be ignored — so deletion targets data_birdset/<hf_name>.
 DATASET_CACHE_ROOT = PROJECT_ROOT / "data_birdset"
+BACKGROUND_NOISE_DIR = DATASET_CACHE_ROOT / "background_noise"
 
 EVAL_PY = PROJECT_ROOT / "birdset" / "eval.py"
 TRAIN_PY = PROJECT_ROOT / "birdset" / "train.py"
 
-# Eight seabird datasets from the BirdSet NeurIPS-24 paper;
+# Eight datasets from the BirdSet paper;
 # hf_name matches the dataset code for each (data_birdset/<hf_name>).
 DT_DATASETS = ["HSN", "NBP", "NES", "PER", "POW", "SNE", "SSW", "UHH"]
 
 
-def eviction_target(hf_name: str) -> Path:
+def deletion_target(hf_name: str) -> Path:
     """data_birdset/<hf_name> directory that BirdSet downloads the dataset into."""
     return DATASET_CACHE_ROOT / hf_name
 
 
-def run_stage(label, script, experiment, hf_name, dry_run=False):
-    """Run one validation stage, then evict its dataset download.
+def check_background_noise() -> bool:
+    """Verify background noise files exist for augmentations; download if missing."""
+    if BACKGROUND_NOISE_DIR.exists() and any(BACKGROUND_NOISE_DIR.iterdir()):
+        n_files = sum(1 for _ in BACKGROUND_NOISE_DIR.iterdir())
+        print(f"[OK]    Background noise: {BACKGROUND_NOISE_DIR} ({n_files} files)")
+        return True
 
-    Disk cleanup deletes only the dataset download (data_birdset/<hf_name>);
-    the run's HYDRA outputs/ and checkpoints are kept.
+    # Auto-download if missing
+    dl_script = PROJECT_ROOT / "resources" / "utils" / "download_background_noise.py"
+    if not dl_script.exists():
+        print(f"[FAIL]  Background noise missing and download script not found: {dl_script}")
+        return False
+    print(f"[WARN]  Background noise missing at {BACKGROUND_NOISE_DIR}")
+    print(f"   Auto-downloading via {dl_script.name} ...")
+    proc = subprocess.run([sys.executable, str(dl_script)], cwd=str(PROJECT_ROOT))
+    if proc.returncode != 0:
+        print(f"[FAIL]  Background noise download failed (exit {proc.returncode})")
+        return False
+    n_files = sum(1 for _ in BACKGROUND_NOISE_DIR.iterdir()) if BACKGROUND_NOISE_DIR.exists() else 0
+    print(f"[OK]    Background noise downloaded: {BACKGROUND_NOISE_DIR} ({n_files} files)")
+    return True
+
+
+def run_stage(label, script, experiment, hf_name, dry_run=False):
+    """Run one validation stage, then delete its dataset download.
+
     Returns True if the stage succeeded (or dry-run).
     """
     cmd = [sys.executable, str(script), f"experiment={experiment}"]
-    target = eviction_target(hf_name)
+    target = deletion_target(hf_name)
     print(f"\n{'=' * 72}")
     print(f"[{label}] {'[dry-run] ' if dry_run else ''}{' '.join(cmd)}")
-    print(f"evict after run: {target}  (-> rm -rf; outputs kept)")
+    print(f"[INFO]  delete after run: {target}  (-> rm -rf; outputs kept)")
     print(f"{'=' * 72}")
     if dry_run:
         return True
     proc = subprocess.run(cmd, cwd=str(PROJECT_ROOT))
-    shutil.rmtree(target, ignore_errors=True)  # evict THIS dataset download only
+    shutil.rmtree(target, ignore_errors=True)  # delete THIS dataset download only
     return proc.returncode == 0
 
 
 def main():
     ap = argparse.ArgumentParser(
-        description="Iterate NeurIPS-24 BirdSet validations with per-dataset eviction"
+        description="Iterate NeurIPS-24 BirdSet validations with per-dataset deletion"
     )
     ap.add_argument("--dry-run", action="store_true",
-                    help="print commands + eviction plan, run nothing")
+                    help="print commands + deletion plan, run nothing")
     ap.add_argument("--datasets", default=",".join(DT_DATASETS),
                     help="comma-separated DT datasets (default: all 8)")
     ap.add_argument("--skip-xcl", action="store_true",
                     help="skip the XCL base-model eval stage (useful after it has already passed)")
+    ap.add_argument("--fail-fast", action="store_true",
+                    help="abort on the first stage failure instead of continuing")
     args = ap.parse_args()
     dt_datasets = [d.strip() for d in args.datasets.split(",") if d.strip()]
 
@@ -94,24 +98,38 @@ def main():
     print(f"dataset cache root = {DATASET_CACHE_ROOT}  "
           f"(per-dataset <hf_name> deleted after each run; outputs kept)")
 
+    if not args.dry_run and not check_background_noise():
+        print("\n[ERROR] Background noise required — aborting before any stage runs.")
+        return 1
+
     ok = True
+    # Stages are independent: XCL is a one-off base-model eval; each DT_{ds}
+    # run fine-tunes + evaluates a different dataset with its own download.
     # 1) base-model eval (XCL) - cheap baseline, run first to de-risk DT runs.
     if not args.skip_xcl:
         if not run_stage("XCL_eval", EVAL_PY, "birdset_neurips24/XCL/efficientnet.yaml",
                          "XCL", args.dry_run):
             ok = False
-            print("!! XCL base eval failed; continuing to DT stages")
+            
+            if args.fail_fast:
+                print("[ERROR] --fail-fast: aborting")
+                return 1
+            else:
+                print("[FAIL]  XCL base eval failed; continuing to DT stages")
     else:
-        print("[skip-xcl] Skipping XCL base-model eval")
+        print("[INFO]  Skipping XCL base-model eval (--skip-xcl)")
 
-    # 2) DT finetune+eval on each dataset, evicting that dataset's download after.
+    # 2) DT finetune+eval on each dataset, deleting that dataset's download after.
     for ds in dt_datasets:
         if not run_stage(f"DT_{ds}", TRAIN_PY, f"birdset_neurips24/{ds}/DT/efficientnet.yaml",
                          ds, args.dry_run):
             ok = False
-            print(f"!! DT {ds} failed; dataset evicted, continuing")
+            print(f"[FAIL]  DT {ds} failed; dataset deleted, continuing")
+            if args.fail_fast:
+                print("[ERROR] --fail-fast: aborting")
+                return 1
 
-    print("\n✓ all validations done" if ok else "\n✗ one or more stages failed")
+    print("\n[OK]    all validations done" if ok else "\n[FAIL]  one or more stages failed")
     return 0 if ok else 1
 
 
