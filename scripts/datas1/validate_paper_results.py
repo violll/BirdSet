@@ -27,6 +27,7 @@ Usage:
     python scripts/datas1/validate_paper_results.py
     python scripts/datas1/validate_paper_results.py --dry-run
     python scripts/datas1/validate_paper_results.py --datasets HSN,NBP
+    python scripts/datas1/validate_paper_results.py --skip-xcl      # skip XCL baseline eval
 """
 import argparse
 import os
@@ -84,6 +85,8 @@ def main():
                     help="print commands + eviction plan, run nothing")
     ap.add_argument("--datasets", default=",".join(DT_DATASETS),
                     help="comma-separated DT datasets (default: all 8)")
+    ap.add_argument("--skip-xcl", action="store_true",
+                    help="skip the XCL base-model eval stage (useful after it has already passed)")
     args = ap.parse_args()
     dt_datasets = [d.strip() for d in args.datasets.split(",") if d.strip()]
 
@@ -93,10 +96,13 @@ def main():
 
     ok = True
     # 1) base-model eval (XCL) - cheap baseline, run first to de-risk DT runs.
-    if not run_stage("XCL_eval", EVAL_PY, "birdset_neurips24/XCL/efficientnet.yaml",
-                     "XCL", args.dry_run):
-        ok = False
-        print("!! XCL base eval failed; continuing to DT stages")
+    if not args.skip_xcl:
+        if not run_stage("XCL_eval", EVAL_PY, "birdset_neurips24/XCL/efficientnet.yaml",
+                         "XCL", args.dry_run):
+            ok = False
+            print("!! XCL base eval failed; continuing to DT stages")
+    else:
+        print("[skip-xcl] Skipping XCL base-model eval")
 
     # 2) DT finetune+eval on each dataset, evicting that dataset's download after.
     for ds in dt_datasets:
