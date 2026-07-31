@@ -13,6 +13,8 @@ Usage:
 import argparse
 import json
 import os
+import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO
 from pathlib import Path
@@ -70,30 +72,64 @@ def load_clements() -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
+# Class mapping generation
+# ---------------------------------------------------------------------------
+def _generate_class_mapping() -> bool:
+    """Generate CLASS_MAPPING_JSON by running extract_datas1_classes.py.
+
+    The ebird-code mapping is a *produced* artifact (intersection of the XCL
+    model label space with DataS1 scientific names), not a static source file.
+    Returns True if the JSON exists afterward. Requires `transformers`, which
+    is available in the BirdSet/RunPod training env but NOT in the local
+    comp0173 smoke-test env.
+    """
+    script = PROJECT_ROOT / "scripts/datas1/extract_datas1_classes.py"
+    if not script.exists():
+        print(f"  Cannot generate: {script} not found")
+        return False
+    print(f"  Generating class mapping via {script.name} ...")
+    try:
+        subprocess.run([sys.executable, str(script)], check=True)
+    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        print(f"  Generation failed: {exc}")
+        return False
+    return CLASS_MAPPING_JSON.exists()
+
+
+# ---------------------------------------------------------------------------
 # Stage: preflight
 # ---------------------------------------------------------------------------
 def stage_preflight() -> bool:
-    """Verify all required source files exist before proceeding."""
+    """Verify all required source files exist before proceeding.
+
+    CLASS_MAPPING_JSON is a *generated* artifact (not a static source): if it
+    is absent, attempt to (re)generate it via extract_datas1_classes.py before
+    reporting preflight failure.
+    """
     missing = []
     checks = [
         ("Clements Excel", CLEMENTS_XLSX),
         ("Test dataset directory", TEST_DATASET_ROOT),
         ("XCL metadata parquet", XCL_METADATA),
-        ("Class mapping JSON", CLASS_MAPPING_JSON)
     ]
     for name, path in checks:
         if not path.exists():
             missing.append(f"{name}: {path}")
+
+    # class mapping is generated, not assumed — regenerate when flagged missing
+    if not CLASS_MAPPING_JSON.exists():
+        if CLEMENTS_XLSX.exists() and ANNOTATIONS_DETAILS.exists():
+            print("Class mapping missing — generating via extract_datas1_classes.py ...")
+            if not _generate_class_mapping():
+                missing.append(f"Class mapping JSON (generation failed): {CLASS_MAPPING_JSON}")
+        else:
+            missing.append(f"Class mapping JSON: {CLASS_MAPPING_JSON}")
+
     if missing:
         print("PREFLIGHT FAILED. Missing required files:")
         for m in missing:
-
             print(f"  - {m}")
-
-            if "Class mapping JSON" in m:
-                raise NotImplementedError("To be implemented")
-
-        print("\nNote: ArcticBirdSounds test audio must be downloaded manually from OSF.")
+        print("\nNote: ArcticBirdSounds test audio must be downloaded manually from OSF (https://osf.io/b9trx/overview)")
         return False
     print("✓ Preflight passed")
     return True
