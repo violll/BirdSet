@@ -31,16 +31,20 @@ PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().pare
 
 CLASS_MAPPING_JSON = PROJECT_ROOT / "resources/ebird_codes/DataS1_ebird_codes.json"
 CLEMENTS_XLSX = PROJECT_ROOT / "resources/ArcticBirdSounds/Clements_v2025-October-2025.xlsx"
+
+TEST_DATASET_ROOT = PROJECT_ROOT / "data/DataS1"
 ANNOTATIONS_DETAILS = PROJECT_ROOT / "data/DataS1/annotations_details.csv"
-DATASET_ROOT = PROJECT_ROOT / "data/DataS1"
+
 TRAIN_FULL_PARQUET = PROJECT_ROOT / "data/DataS1_DT_train/ogg/metadata-full.parquet"
 TRAIN_PARQUET = PROJECT_ROOT / "data/DataS1_DT_train/metadata-train.parquet"
 BOXED_ANNOTATIONS_CSV = PROJECT_ROOT / "data/DataS1/boxed_annotations_input_reindexed.csv"
-TEST_PARQUET_OUT = PROJECT_ROOT / "data/DataS1/metadata.parquet"
+TEST_PARQUET = PROJECT_ROOT / "data/DataS1/metadata.parquet"
+
 WEIGHTS_OUT = PROJECT_ROOT / "resources/models/EfficientNet-B1-BirdSet-XCL.ckpt"
+XCL_METADATA = PROJECT_ROOT / "data/xcl/XCL_metadata.parquet" 
 
 # Test audio (OSF - manual download required)
-TEST_AUDIO_DIR = DATASET_ROOT / "audio_annots"
+TEST_AUDIO_DIR = TEST_DATASET_ROOT / "audio_annots"
 
 
 # ---------------------------------------------------------------------------
@@ -72,10 +76,10 @@ def stage_preflight() -> bool:
     """Verify all required source files exist before proceeding."""
     missing = []
     checks = [
-        ("annotations_details.csv", ANNOTATIONS_DETAILS),
         ("Clements Excel", CLEMENTS_XLSX),
-        ("Class mapping JSON", CLASS_MAPPING_JSON),
-        ("Test audio directory", TEST_AUDIO_DIR),
+        ("Test dataset directory", TEST_DATASET_ROOT),
+        ("XCL metadata parquet", XCL_METADATA),
+        ("Class mapping JSON", CLASS_MAPPING_JSON)
     ]
     for name, path in checks:
         if not path.exists():
@@ -83,7 +87,12 @@ def stage_preflight() -> bool:
     if missing:
         print("PREFLIGHT FAILED. Missing required files:")
         for m in missing:
+
             print(f"  - {m}")
+
+            if "Class mapping JSON" in m:
+                raise NotImplementedError("To be implemented")
+
         print("\nNote: ArcticBirdSounds test audio must be downloaded manually from OSF.")
         return False
     print("✓ Preflight passed")
