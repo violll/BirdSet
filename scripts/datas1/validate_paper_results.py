@@ -16,20 +16,18 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Repo root (script lives at <repo>/scripts/datas1/validate_paper_results.py).
+# Repo root (script lives at <repo>/scripts/datas1/validate_paper_results.py)
 PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().parents[2]))
 
-# BirdSet downloads each dataset into data_birdset/<hf_name> via explicit
-# cache_dir=<data_dir> in base_datamodule.py:269. The HF_DATASETS_CACHE
-# env var would be ignored — so deletion targets data_birdset/<hf_name>.
+# Dataset cache set by BirdSet
 DATASET_CACHE_ROOT = PROJECT_ROOT / "data_birdset"
 BACKGROUND_NOISE_DIR = DATASET_CACHE_ROOT / "background_noise"
 
 EVAL_PY = PROJECT_ROOT / "birdset" / "eval.py"
 TRAIN_PY = PROJECT_ROOT / "birdset" / "train.py"
 
-# Eight datasets from the BirdSet paper;
-# hf_name matches the dataset code for each (data_birdset/<hf_name>).
+# Eight datasets from the BirdSet paper
+# hf_name matches the dataset code for each (data_birdset/<hf_name>)
 DT_DATASETS = ["HSN", "NBP", "NES", "PER", "POW", "SNE", "SSW", "UHH"]
 
 
@@ -99,18 +97,20 @@ def main():
           f"(per-dataset <hf_name> deleted after each run; outputs kept)")
 
     if not args.dry_run and not check_background_noise():
-        print("\n[ERROR] Background noise required — aborting before any stage runs.")
+        print("\n[ERROR] Background noise required - aborting before any stage runs.")
         return 1
 
     ok = True
-    # Stages are independent: XCL is a one-off base-model eval; each DT_{ds}
-    # run fine-tunes + evaluates a different dataset with its own download.
-    # 1) base-model eval (XCL) - cheap baseline, run first to de-risk DT runs.
+
+    # NOTE failures may have independent causes; continues by default
+    # Override this behavior with --fail-fast to exit upon first failure
+
+    # 1) base-model eval (XCL)
     if not args.skip_xcl:
         if not run_stage("XCL_eval", EVAL_PY, "birdset_neurips24/XCL/efficientnet.yaml",
                          "XCL", args.dry_run):
             ok = False
-            
+
             if args.fail_fast:
                 print("[ERROR] --fail-fast: aborting")
                 return 1
@@ -119,15 +119,17 @@ def main():
     else:
         print("[INFO]  Skipping XCL base-model eval (--skip-xcl)")
 
-    # 2) DT finetune+eval on each dataset, deleting that dataset's download after.
+    # 2) DT finetune+eval on each dataset, deleting that dataset's download after
     for ds in dt_datasets:
         if not run_stage(f"DT_{ds}", TRAIN_PY, f"birdset_neurips24/{ds}/DT/efficientnet.yaml",
                          ds, args.dry_run):
             ok = False
-            print(f"[FAIL]  DT {ds} failed; dataset deleted, continuing")
+
             if args.fail_fast:
                 print("[ERROR] --fail-fast: aborting")
                 return 1
+            else:
+                print(f"[FAIL]  DT {ds} failed; dataset deleted, continuing")
 
     print("\n[OK]    all validations done" if ok else "\n[FAIL]  one or more stages failed")
     return 0 if ok else 1
