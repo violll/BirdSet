@@ -14,7 +14,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
-REPO_ROOT = Path(__file__).resolve().parents[1]          # BirdSet/
+REPO_ROOT = Path(__file__).resolve().parents[2]          # BirdSet/
 MODEL_REF = "DBD-research-group/EfficientNet-B1-BirdSet-XCL"
 CLEMENTS_XLSX = REPO_ROOT / "resources/ArcticBirdSounds/Clements_v2025-October-2025.xlsx"
 ANNOTATIONS_DETAILS = REPO_ROOT / "data/DataS1/annotations_details.csv"
