@@ -1,9 +1,7 @@
 """
-schema_align.py
+extract_datas1_classes.py
 Derive the authoritative DataS1 target classes and write the canonical
 DataS1 ebird-code mapping.
-
-Source of truth for class derivation: test.ipynb
 """
 import json
 
