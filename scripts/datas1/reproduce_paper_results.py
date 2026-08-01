@@ -18,6 +18,10 @@ from pathlib import Path
 # Repo root (script lives at <repo>/scripts/datas1/validate_paper_results.py)
 PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().parents[2]))
 
+# Manually set HF_HOME
+HF_HOME = PROJECT_ROOT / "data_birdset" / "hf_cache"
+os.environ["HF_HOME"] = str(HF_HOME)
+
 # Dataset cache set by BirdSet
 DATASET_CACHE_ROOT = PROJECT_ROOT / "data_birdset"
 BACKGROUND_NOISE_DIR = DATASET_CACHE_ROOT / "background_noise"
