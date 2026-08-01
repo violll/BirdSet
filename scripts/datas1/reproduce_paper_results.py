@@ -16,18 +16,18 @@ import sys
 from pathlib import Path
 
 # Repo root (script lives at <repo>/scripts/datas1/validate_paper_results.py)
-PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().parents[2]))
+REPO_ROOT = Path(os.environ.get("REPO_ROOT", Path(__file__).resolve().parents[2]))
 
 # Manually set HF_HOME
-HF_HOME = PROJECT_ROOT / "data_birdset" / "hf_cache"
+HF_HOME = REPO_ROOT / "data_birdset" / "hf_cache"
 os.environ["HF_HOME"] = str(HF_HOME)
 
 # Dataset cache set by BirdSet
-DATASET_CACHE_ROOT = PROJECT_ROOT / "data_birdset"
+DATASET_CACHE_ROOT = REPO_ROOT / "data_birdset"
 BACKGROUND_NOISE_DIR = DATASET_CACHE_ROOT / "background_noise"
 
-EVAL_PY = PROJECT_ROOT / "birdset" / "eval.py"
-TRAIN_PY = PROJECT_ROOT / "birdset" / "train.py"
+EVAL_PY = REPO_ROOT / "birdset" / "eval.py"
+TRAIN_PY = REPO_ROOT / "birdset" / "train.py"
 
 # Eight datasets from the BirdSet paper
 # hf_name matches the dataset code for each (data_birdset/<hf_name>)
@@ -42,13 +42,13 @@ def check_background_noise() -> bool:
         return True
 
     # Auto-download if missing
-    dl_script = PROJECT_ROOT / "resources" / "utils" / "download_background_noise.py"
+    dl_script = REPO_ROOT / "resources" / "utils" / "download_background_noise.py"
     if not dl_script.exists():
         print(f"[FAIL]  Background noise missing and download script not found: {dl_script}")
         return False
     print(f"[WARN]  Background noise missing at {BACKGROUND_NOISE_DIR}")
     print(f"   Auto-downloading via {dl_script.name} ...")
-    proc = subprocess.run([sys.executable, str(dl_script)], cwd=str(PROJECT_ROOT))
+    proc = subprocess.run([sys.executable, str(dl_script)], cwd=str(REPO_ROOT))
     if proc.returncode != 0:
         print(f"[FAIL]  Background noise download failed (exit {proc.returncode})")
         return False
@@ -68,7 +68,7 @@ def run_stage(label, script, experiment, dry_run=False):
     print(f"{'=' * 72}")
     if dry_run:
         return True
-    proc = subprocess.run(cmd, cwd=str(PROJECT_ROOT))
+    proc = subprocess.run(cmd, cwd=str(REPO_ROOT))
     return proc.returncode == 0
 
 
@@ -87,7 +87,7 @@ def main():
     args = ap.parse_args()
     dt_datasets = [d.strip() for d in args.datasets.split(",") if d.strip()]
 
-    print(f"PROJECT_ROOT = {PROJECT_ROOT}")
+    print(f"REPO_ROOT = {REPO_ROOT}")
     print(f"dataset cache root = {DATASET_CACHE_ROOT}")
 
     if not args.dry_run and not check_background_noise():

@@ -11,22 +11,22 @@ from pathlib import Path
 import pandas as pd
 
 # ---------------------------------------------------------------------------
-# Paths (PROJECT_ROOT resolves to repo root at runtime)
+# Paths (REPO_ROOT resolves to repo root at runtime)
 # ---------------------------------------------------------------------------
-PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().parents[2]))
+REPO_ROOT = Path(os.environ.get("REPO_ROOT", Path(__file__).resolve().parents[2]))
 
-CLASS_MAPPING_JSON = PROJECT_ROOT / "resources/ebird_codes/DataS1_ebird_codes.json"
-CLEMENTS_XLSX = PROJECT_ROOT / "resources/ArcticBirdSounds/Clements_v2025-October-2025.xlsx"
+CLASS_MAPPING_JSON = REPO_ROOT / "resources/ebird_codes/DataS1_ebird_codes.json"
+CLEMENTS_XLSX = REPO_ROOT / "resources/ArcticBirdSounds/Clements_v2025-October-2025.xlsx"
 
-TEST_DATASET_ROOT = PROJECT_ROOT / "data/DataS1"
-ANNOTATIONS_DETAILS = PROJECT_ROOT / "data/DataS1/annotations_details.csv"
+TEST_DATASET_ROOT = REPO_ROOT / "data/DataS1"
+ANNOTATIONS_DETAILS = REPO_ROOT / "data/DataS1/annotations_details.csv"
 
-TRAIN_PARQUET = PROJECT_ROOT / "data/DataS1_DT_train/metadata-train.parquet"
-BOXED_ANNOTATIONS_CSV = PROJECT_ROOT / "data/DataS1/boxed_annotations_input_reindexed.csv"
-TEST_PARQUET = PROJECT_ROOT / "data/DataS1/metadata.parquet"
+TRAIN_PARQUET = REPO_ROOT / "data/DataS1_DT_train/metadata-train.parquet"
+BOXED_ANNOTATIONS_CSV = REPO_ROOT / "data/DataS1/boxed_annotations_input_reindexed.csv"
+TEST_PARQUET = REPO_ROOT / "data/DataS1/metadata.parquet"
 
-WEIGHTS_OUT = PROJECT_ROOT / "resources/models/EfficientNet-B1-BirdSet-XCL.ckpt"
-XCL_METADATA = PROJECT_ROOT / "data/xcl/XCL_metadata.parquet"
+WEIGHTS_OUT = REPO_ROOT / "resources/models/EfficientNet-B1-BirdSet-XCL.ckpt"
+XCL_METADATA = REPO_ROOT / "data/xcl/XCL_metadata.parquet"
 
 # Test audio (ArcticBirdSounds — manual OSF download)
 TEST_AUDIO_DIR = TEST_DATASET_ROOT / "audio_annots"
@@ -82,7 +82,7 @@ def _generate_class_mapping() -> bool:
     is available in the BirdSet/RunPod training env but NOT in the local
     comp0173 smoke-test env.
     """
-    script = PROJECT_ROOT / "scripts/datas1/extract_datas1_classes.py"
+    script = REPO_ROOT / "scripts/datas1/extract_datas1_classes.py"
     if not script.exists():
         print(f"  Cannot generate: {script} not found")
         return False
