@@ -28,7 +28,7 @@ TEST_PARQUET = REPO_ROOT / "data/DataS1/metadata.parquet"
 WEIGHTS_OUT = REPO_ROOT / "resources/models/EfficientNet-B1-BirdSet-XCL.ckpt"
 XCL_METADATA = REPO_ROOT / "data/xcl/XCL_metadata.parquet"
 
-# Test audio (ArcticBirdSounds — manual OSF download)
+# Test audio (ArcticBirdSounds - manual OSF download)
 TEST_AUDIO_DIR = TEST_DATASET_ROOT / "audio_annots"
 
 # HuggingFace Hub identifiers
@@ -115,10 +115,10 @@ def stage_preflight() -> bool:
         if not path.exists():
             missing.append(f"{name}: {path}")
 
-    # class mapping is generated, not assumed — regenerate when flagged missing
+    # class mapping is generated, not assumed - regenerate when flagged missing
     if not CLASS_MAPPING_JSON.exists():
         if CLEMENTS_XLSX.exists() and ANNOTATIONS_DETAILS.exists():
-            print("Class mapping missing — generating via extract_datas1_classes.py ...")
+            print("Class mapping missing - generating via extract_datas1_classes.py ...")
             if not _generate_class_mapping():
                 missing.append(f"Class mapping JSON (generation failed): {CLASS_MAPPING_JSON}")
         else:

@@ -1,4 +1,4 @@
-"""Stage: build — assemble final DataS1 test_5s dataset and train split.
+"""Stage: build - assemble final DataS1 test_5s dataset and train split.
 
 Steps (folded from build_datas1.py / test.ipynb):
 1. Build boxed annotations CSV with reindexed ebird codes (Clements Excel lookup)
