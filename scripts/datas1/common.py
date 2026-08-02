@@ -129,6 +129,7 @@ def stage_preflight() -> bool:
         for m in missing:
             print(f"  - {m}")
         print("\nNote: ArcticBirdSounds test audio must be downloaded manually from OSF (https://osf.io/b9trx/overview)")
+        print("\nNote: XCL metadata parquet is only required if data is downloaded via xc method")
         return False
     print("[OK] Preflight passed")
     return True

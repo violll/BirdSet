@@ -44,7 +44,7 @@ def main():
         choices=["xc", "hf"],
         default="xc",
         help="XCL audio source: 'xc' = download from xeno-canto (default), "
-             "'hf' = use full XCL from HF Hub cache (stub)",
+             "'hf' = use full XCL from HF Hub cache",
     )
     args = parser.parse_args()
 

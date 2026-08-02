@@ -7,6 +7,7 @@ Modes ('--xcl-source'):
 Output: TRAIN_PARQUET (metadata-train.parquet)
 """
 import os
+from pathlib import Path
 import random
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -18,11 +19,21 @@ from pydub import AudioSegment
 from tqdm.auto import tqdm
 
 from common import (
+    REPO_ROOT,
     TRAIN_PARQUET,
     XCL_METADATA,
     XCL_HF_PATH,
     XCL_HF_NAME,
 )
+
+# Manually set HF_HOME
+HF_HOME = REPO_ROOT / "data_birdset" / "hf_cache"
+DATASET_CACHE_ROOT = REPO_ROOT / "data_birdset" / "XCL"
+
+os.environ["HF_HOME"] = str(HF_HOME)
+os.environ["HF_DATASETS_CACHE"] = str(DATASET_CACHE_ROOT)
+
+from datasets import Audio, load_dataset
 
 
 def _log_failure(message: str) -> None:
@@ -113,6 +124,45 @@ def _write_train_parquet(target_df: pd.DataFrame) -> None:
     print("Done!")
 
 
+def _load_hf_xcl_dataset(target_classes: list[str], label2id: dict[str, int]) -> pd.DataFrame:
+    """Load XCL from HF Hub, filter to target classes, remap labels.
+    """
+    print(f"Loading XCL dataset from HF Hub ({XCL_HF_PATH}/{XCL_HF_NAME})...")
+    dataset = load_dataset(XCL_HF_PATH, XCL_HF_NAME, num_proc=12)
+
+    # Handle DatasetDict (train split) or bare Dataset
+    if hasattr(dataset, "keys"):
+        dataset = dataset["train"]
+
+    # Build ClassLabel int -> DataS1 int index lookup
+    ebird_code_names = dataset.features["ebird_code"].names
+    int_to_datas1 = {
+        i: label2id[name] for i, name in enumerate(ebird_code_names) if name in label2id
+    }
+    target_int_ids = set(int_to_datas1.keys())
+
+    print(f"Filtering {len(dataset)} rows to {len(target_classes)} target classes...")
+    dataset = dataset.filter(
+        lambda x: x["ebird_code"] in target_int_ids, num_proc=12,
+    )
+    print(f"Found {len(dataset)} samples for target classes")
+
+    # Convert to pandas - triggers cache download for filtered rows
+    df = dataset.to_pandas()
+
+    # Remap ebird_code: ClassLabel int -> DataS1 int index
+    df["ebird_code"] = df["ebird_code"].map(
+        lambda c: int_to_datas1.get(int(c), pd.NA) if pd.notna(c) else pd.NA
+    )
+
+    # Remap ebird_code_multilabel: list of ClassLabel ints -> list of DataS1 int indices
+    df["ebird_code_multilabel"] = df["ebird_code_multilabel"].apply(
+        lambda c: [int_to_datas1.get(int(name), None) for name in c] if c is not None else []
+    )
+
+    return df
+
+
 def stage_download_train(target_classes: list[str], label2id: dict[str, int], xcl_source: str = "xc") -> None:
     """Prepare XCL training data for the 31 target classes.
 
@@ -122,10 +172,9 @@ def stage_download_train(target_classes: list[str], label2id: dict[str, int], xc
     Output: TRAIN_PARQUET (metadata-train.parquet)
     """
     if xcl_source == "hf":
-        raise NotImplementedError(
-            "hf mode requires XCL audio pre-downloaded via HF Hub. "
-            "Download full XCL first, then implement path resolution."
-        )
+        df = _load_hf_xcl_dataset(target_classes, label2id)
+        _write_train_parquet(df)
+        return
 
     # --- xc mode: download from xeno-canto ---
     output_dir = str(os.path.join(TRAIN_PARQUET.parent, "ogg"))
