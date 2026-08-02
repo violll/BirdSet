@@ -123,12 +123,17 @@ class BaseTransforms:
         2. Applies feature extraction with FeatureExtractor
         """
         batch = self.decode_batch(batch)
-
         input_values, labels = self.transform_values(batch)
-
         labels = self.transform_labels(labels)
 
-        return {"input_values": input_values, "labels": labels}
+        result = {
+            "input_values": input_values,
+            "labels": labels,
+        }
+        # Only pass filepath through in test mode (needed for per-sample predictions)
+        if self.mode == "test":
+            result["filepath"] = batch.get("filepath")
+        return result
 
     def decode_batch(self, batch):
         # we overwrite the feature extractor with None because we can do this here manually

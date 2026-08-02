@@ -1,4 +1,5 @@
 from dataclasses import asdict
+import os
 import torch
 import wandb
 from typing import Callable, Literal, Type, Optional
@@ -6,6 +7,8 @@ from torch.nn import BCEWithLogitsLoss
 from torch.nn.modules.loss import _Loss
 from torch.optim import AdamW, Optimizer
 from functools import partial
+
+import pandas as pd
 
 from .base_module import BaseModule
 from birdset.configs import (
@@ -22,6 +25,7 @@ class MultilabelModule(BaseModule):
 
     Attributes:
         prediction_table (bool): Whether to create a prediction table. Defaults to False.
+        save_predictions (bool): Whether to save per-sample predictions to CSV. Defaults to False.
     """
 
     def __init__(
@@ -43,10 +47,11 @@ class MultilabelModule(BaseModule):
         task: Literal["multiclass", "multilabel"] = "multilabel",
         num_gpus: int = 1,
         prediction_table: bool = False,
+        save_predictions: bool = False,
         pretrain_info=None,
     ):
-
         self.prediction_table = prediction_table
+        self.save_predictions = save_predictions
 
         super().__init__(
             network=network,
@@ -58,13 +63,20 @@ class MultilabelModule(BaseModule):
             logging_params=logging_params,
             num_epochs=num_epochs,
             len_trainset=len_trainset,
-            task=task,
             batch_size=batch_size,
+            task=task,
             num_gpus=num_gpus,
             pretrain_info=pretrain_info,
         )
 
+        self.test_filepaths = []
+
     def test_step(self, batch, batch_idx):
+        # Pop filepath metadata before model_step so it is not passed to forward
+        filepath = batch.pop("filepath", None)
+        if filepath is not None:
+            self.test_filepaths.append(filepath)
+
         test_loss, preds, targets = self.model_step(batch, batch_idx)
 
         # save targets and predictions for test_epoch_end
@@ -107,6 +119,36 @@ class MultilabelModule(BaseModule):
 
         if self.prediction_table:
             self._wandb_prediction_table(test_preds, test_targets)
+
+        if self.save_predictions and self.trainer.is_global_zero:
+            all_filepaths = []
+            for fp_batch in self.test_filepaths:
+                all_filepaths.extend(fp_batch)
+
+            # Top-1 predicted label from sigmoid probabilities
+            top_probs, top_indices = test_preds.topk(dim=1, k=1)
+            predicted_labels = top_indices.squeeze(1).tolist()
+            confidences = top_probs.squeeze(1).tolist()
+
+            # All true labels per sample (multi-hot -> all indices where target==1)
+            # Aligned with TopKAccuracy which checks if top-1 pred is among any true label
+            true_labels = [
+                ", ".join(str(i) for i in row.nonzero(as_tuple=False).squeeze(1).tolist())
+                for row in test_targets
+            ]
+
+            df = pd.DataFrame(
+                {
+                    "filepath": all_filepaths,
+                    "predicted_label": predicted_labels,
+                    "confidence": confidences,
+                    "true_labels": true_labels,
+                }
+            )
+
+            output_path = os.path.join(os.getcwd(), "test_predictions.csv")
+            df.to_csv(output_path, index=False)
+            print(f"[OK] Saved {len(df)} per-sample predictions to {output_path}")
 
     def _wandb_prediction_table(self, preds, targets):
         top5_values_preds, top5_indices_preds = preds.topk(dim=1, k=5, sorted=True)
