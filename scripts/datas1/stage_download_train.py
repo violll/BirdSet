@@ -7,7 +7,6 @@ Modes ('--xcl-source'):
 Output: TRAIN_PARQUET (metadata-train.parquet)
 """
 import os
-from pathlib import Path
 import random
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -119,6 +118,11 @@ def _download_xc_files(target_df: pd.DataFrame) -> None:
 def _write_train_parquet(target_df: pd.DataFrame) -> None:
     """Filter to existing files and write metadata-train.parquet."""
     available = target_df[target_df["filepath"].map(os.path.exists)]
+
+    # create dir if it doesn't exist
+    output_dir = str(TRAIN_PARQUET.parent)
+    os.makedirs(output_dir, exist_ok=True)
+
     available.to_parquet(TRAIN_PARQUET)
     print(f"Wrote train parquet: {TRAIN_PARQUET} ({len(available)} rows)")
     print("Done!")
